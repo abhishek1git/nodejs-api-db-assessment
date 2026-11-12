@@ -23,11 +23,15 @@ after(async () => {
   }
 });
 
-async function http(pathname, { method = "GET", body, rawBody } = {}) {
+async function http(pathname, { method = "GET", body, rawBody, headers } = {}) {
   const options = { method };
+  const requestHeaders = { ...headers };
   if (body !== undefined || rawBody !== undefined) {
-    options.headers = { "Content-Type": "application/json" };
+    requestHeaders["Content-Type"] = "application/json";
     options.body = rawBody !== undefined ? rawBody : JSON.stringify(body);
+  }
+  if (Object.keys(requestHeaders).length > 0) {
+    options.headers = requestHeaders;
   }
 
   const res = await fetch(`${api.baseUrl}${pathname}`, options);
@@ -87,13 +91,20 @@ describe("service documentation", () => {
 
 describe("core endpoints over HTTP", () => {
   it("returns a seeded customer", async () => {
-    const res = await http("/customers/cust_001");
+    // serverless-offline mirrors the request Origin when the event has CORS
+    // configured; API Gateway itself returns the handler's "*" header.
+    const res = await http("/customers/cust_001", {
+      headers: { Origin: "http://localhost:5173" },
+    });
 
     assert.equal(res.status, 200);
     assert.equal(res.json.customerId, "cust_001");
     assert.equal(res.json.email, "ada@example.com");
     assert.match(res.headers.get("content-type"), /application\/json/);
-    assert.equal(res.headers.get("access-control-allow-origin"), "*");
+    assert.equal(
+      res.headers.get("access-control-allow-origin"),
+      "http://localhost:5173"
+    );
   });
 
   it("returns 404 for an unknown customer", async () => {

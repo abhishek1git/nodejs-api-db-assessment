@@ -3,19 +3,31 @@
 const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
 
-const endpoint = process.env.DYNAMODB_ENDPOINT || "http://localhost:8000";
 const region = process.env.AWS_REGION || "us-east-1";
 const customersTable = process.env.CUSTOMERS_TABLE || "Customers";
 const accountsTable = process.env.ACCOUNTS_TABLE || "Accounts";
 
+// Unset → DynamoDB Local. Set to an AWS endpoint (or "") to use the default
+// credential chain instead of the local dummy credentials.
+const endpointVar = process.env.DYNAMODB_ENDPOINT;
+const endpoint =
+  endpointVar === undefined ? "http://localhost:8000" : endpointVar || undefined;
+const isLocalEndpoint =
+  typeof endpoint === "string" &&
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(endpoint);
+
 const client = DynamoDBDocumentClient.from(
   new DynamoDBClient({
     region,
-    endpoint,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || "local",
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "local",
-    },
+    ...(endpoint ? { endpoint } : {}),
+    ...(isLocalEndpoint
+      ? {
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID || "local",
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "local",
+          },
+        }
+      : {}),
   })
 );
 

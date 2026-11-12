@@ -10,8 +10,10 @@ info:
   version: 1.0.0
 
 servers:
-  - url: http://localhost:3000
-    description: Local serverless-offline
+  # Relative URL: Swagger UI resolves it against this document, so "Try it out"
+  # works both on serverless-offline and behind an API Gateway stage path.
+  - url: .
+    description: Current host (local serverless-offline or deployed API Gateway)
 
 tags:
   - name: Customers

@@ -83,6 +83,7 @@ out
 # Ignore dist contents except candidate distribution zips
 dist/*
 !dist/*.zip
+frontend/dist/
 .output
 
 # Gatsby files

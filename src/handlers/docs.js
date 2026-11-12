@@ -26,7 +26,8 @@ async function ui() {
   <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
   <script>
     window.ui = SwaggerUIBundle({
-      url: "/openapi.yaml",
+      // Relative so the UI also works behind an API Gateway stage path (/prod/docs).
+      url: "openapi.yaml",
       dom_id: "#swagger-ui",
       deepLinking: true,
       presets: [SwaggerUIBundle.presets.apis],
