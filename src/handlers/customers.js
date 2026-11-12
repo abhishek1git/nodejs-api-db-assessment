@@ -1,18 +1,25 @@
 "use strict";
 
-const { notImplemented, parseJsonBody } = require("../lib/response");
-// const { docClient, TABLES } = require("../lib/dynamodb");
-// const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
-// const { v4: uuidv4 } = require("uuid");
+const { randomUUID } = require("node:crypto");
+const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+const { docClient, TABLES } = require("../lib/dynamodb");
+const { wrapHandler } = require("../lib/handler");
+const {
+  badRequest,
+  created,
+  notFound,
+  ok,
+  parseJsonBody,
+} = require("../lib/response");
+const {
+  isNonEmptyString,
+  isPlainObject,
+  isValidEmail,
+} = require("../lib/validation");
 
 /**
  * POST /customers
- *
- * TODO: Create a customer in DynamoDB.
- * - Validate fullName and email (see openapi/openapi.yaml)
- * - Generate a customerId
- * - Persist to Customers table
- * - Return 201 with the Customer object
+ * Create a customer in DynamoDB.
  */
 async function create(event) {
   const parsed = parseJsonBody(event);
@@ -20,28 +27,63 @@ async function create(event) {
     return parsed.response;
   }
 
-  // const { fullName, email } = parsed.data;
-  return notImplemented("Implement POST /customers");
+  const body = parsed.data;
+  if (!isPlainObject(body)) {
+    return badRequest("Request body must be a JSON object");
+  }
+  if (body.fullName === undefined) {
+    return badRequest("fullName is required");
+  }
+  if (!isNonEmptyString(body.fullName)) {
+    return badRequest("fullName must be a non-empty string");
+  }
+  if (body.email === undefined) {
+    return badRequest("email is required");
+  }
+  if (!isNonEmptyString(body.email)) {
+    return badRequest("email must be a non-empty string");
+  }
+  if (!isValidEmail(body.email)) {
+    return badRequest("email must be a valid email address");
+  }
+
+  const customer = {
+    customerId: `cust_${randomUUID()}`,
+    fullName: body.fullName.trim(),
+    email: body.email.trim(),
+    status: "ACTIVE",
+    createdAt: new Date().toISOString(),
+  };
+
+  await docClient.send(
+    new PutCommand({ TableName: TABLES.customers, Item: customer })
+  );
+
+  return created(customer);
 }
 
 /**
  * GET /customers/{customerId}
- *
- * TODO: Load a customer by id from DynamoDB.
- * - Read customerId from event.pathParameters
- * - Return 200 with Customer, or 404 if missing
+ * Load a customer by id from DynamoDB.
  */
 async function get(event) {
   const customerId = event.pathParameters?.customerId;
-
   if (!customerId) {
-    return notImplemented("Implement GET /customers/{customerId}");
+    return badRequest("customerId path parameter is required");
   }
 
-  return notImplemented(`Implement GET /customers/${customerId}`);
+  const result = await docClient.send(
+    new GetCommand({ TableName: TABLES.customers, Key: { customerId } })
+  );
+
+  if (!result.Item) {
+    return notFound(`Customer ${customerId} not found`);
+  }
+
+  return ok(result.Item);
 }
 
 module.exports = {
-  create,
-  get,
+  create: wrapHandler(create),
+  get: wrapHandler(get),
 };

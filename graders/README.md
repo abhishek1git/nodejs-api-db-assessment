@@ -12,4 +12,11 @@ Assertions expect a completed implementation (not the stock `501` stubs).
 
 ## Smoke tests
 
-HTTP smoke tests live on the private `cursor/reference-solution` branch (`npm run test:smoke`).
+The automated suites run against an in-memory DynamoDB (`dynalite`) and do not
+require Docker:
+
+- `npm test` — everything (handler + HTTP)
+- `npm run test:handlers` — Lambda handlers invoked with API Gateway-shaped events
+- `npm run test:e2e` — boots `serverless-offline` and calls the API over HTTP
+
+See [`../NOTES.md`](../NOTES.md) for what the suites cover.

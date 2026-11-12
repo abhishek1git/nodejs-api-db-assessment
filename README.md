@@ -11,6 +11,7 @@ cp .env.example .env
 npm install
 npm run setup
 npm start
+npm test               # no Docker needed; uses an in-memory DynamoDB
 ```
 
 - API: http://localhost:3000  
@@ -31,11 +32,13 @@ npm start
 ```
 openapi/openapi.yaml          API contract (source of truth)
 serverless.yml                Function ↔ HTTP route mapping
-src/handlers/                 Lambda-style handlers (stubs → implement)
-src/lib/                      DynamoDB client + response helpers
+src/handlers/                 Lambda-style handlers
+src/lib/                      DynamoDB client, responses, validation, error wrapper
 scripts/                      Create tables, seed data, wait-for-db
+test/                         Handler + HTTP tests (node:test + in-memory DynamoDB)
 docker-compose.yml            DynamoDB Local
 ASSESSMENT.md                 Candidate brief
+NOTES.md                      Design decisions and testing notes
 ```
 
 ## Useful commands
@@ -44,6 +47,9 @@ ASSESSMENT.md                 Candidate brief
 |---------|---------|
 | `npm run setup` | Start DB, create tables, seed |
 | `npm start` | Run API locally (port 3000) |
+| `npm test` | Run all tests (no Docker required) |
+| `npm run test:handlers` | Handler tests only |
+| `npm run test:e2e` | Serverless-offline HTTP tests only |
 | `npm run db:reset` | Recreate tables + reseed |
 | `npm run db:down` | Stop DynamoDB Local |
 
