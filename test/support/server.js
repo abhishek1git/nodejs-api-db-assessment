@@ -62,11 +62,22 @@ function stopChild(child) {
  */
 async function startApi() {
   const port = await getFreePort();
+  const lambdaPort = await getFreePort();
   let output = "";
 
   const child = spawn(
     process.execPath,
-    [SERVERLESS_BIN, "offline", "start", "--httpPort", String(port), "--host", "127.0.0.1"],
+    [
+      SERVERLESS_BIN,
+      "offline",
+      "start",
+      "--httpPort",
+      String(port),
+      "--lambdaPort",
+      String(lambdaPort),
+      "--host",
+      "127.0.0.1",
+    ],
     {
       cwd: ROOT,
       env: {
