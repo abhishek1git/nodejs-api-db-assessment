@@ -4,14 +4,13 @@ frameworkVersion: "3"
 
 provider:
   name: aws
-  runtime: nodejs18.x
-  stage: local
-  region: ${env:AWS_REGION, 'us-east-1'}
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'local'}
+  region: ${opt:region, 'us-east-1'}
   environment:
-    DYNAMODB_ENDPOINT: ${env:DYNAMODB_ENDPOINT, 'http://localhost:8000'}
-    CUSTOMERS_TABLE: ${env:CUSTOMERS_TABLE, 'Customers'}
-    ACCOUNTS_TABLE: ${env:ACCOUNTS_TABLE, 'Accounts'}
-  # IAM is unused for local DynamoDB; kept for realism if you later deploy to AWS
+    DYNAMODB_ENDPOINT: ${self:custom.stageConfig.${self:provider.stage}.dynamodbEndpoint}
+    CUSTOMERS_TABLE: ${self:custom.stageConfig.${self:provider.stage}.customersTable}
+    ACCOUNTS_TABLE: ${self:custom.stageConfig.${self:provider.stage}.accountsTable}
   iam:
     role:
       statements:
@@ -20,18 +19,45 @@ provider:
             - dynamodb:GetItem
             - dynamodb:PutItem
             - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
             - dynamodb:Query
-            - dynamodb:Scan
-          Resource: "*"
+          Resource:
+            - Fn::GetAtt: [CustomersTable, Arn]
+            - Fn::GetAtt: [AccountsTable, Arn]
+            - Fn::Join:
+                - ""
+                - - Fn::GetAtt: [AccountsTable, Arn]
+                  - "/index/CustomerIdIndex"
 
 plugins:
   - serverless-offline
 
 custom:
+  # Only `local` and `prod` are supported so that table names and endpoints
+  # are always explicit. Add another entry here if you need a new stage.
+  stageConfig:
+    local:
+      # Honours the e2e harness so tests use their own in-memory instance.
+      dynamodbEndpoint: ${env:DYNAMODB_ENDPOINT, 'http://localhost:8000'}
+      customersTable: Customers
+      accountsTable: Accounts
+    prod:
+      dynamodbEndpoint: ""
+      customersTable: ${self:service}-${self:provider.stage}-Customers
+      accountsTable: ${self:service}-${self:provider.stage}-Accounts
   serverless-offline:
     httpPort: 3000
     noPrependStageInUrl: true
+
+package:
+  patterns:
+    - "!frontend/**"
+    - "!test/**"
+    - "!graders/**"
+    - "!dist/**"
+    - "!scripts/**"
+    - "!docker-compose.yml"
+    - "!.env*"
+    - "!**/*.md"
 
 functions:
   docsUi:
@@ -40,6 +66,7 @@ functions:
       - http:
           path: docs
           method: get
+          cors: true
 
   openapiSpec:
     handler: src/handlers/docs.openapi
@@ -47,6 +74,7 @@ functions:
       - http:
           path: openapi.yaml
           method: get
+          cors: true
 
   createCustomer:
     handler: src/handlers/customers.create
@@ -54,6 +82,7 @@ functions:
       - http:
           path: customers
           method: post
+          cors: true
 
   getCustomer:
     handler: src/handlers/customers.get
@@ -61,6 +90,7 @@ functions:
       - http:
           path: customers/{customerId}
           method: get
+          cors: true
 
   createAccount:
     handler: src/handlers/accounts.create
@@ -68,6 +98,7 @@ functions:
       - http:
           path: customers/{customerId}/accounts
           method: post
+          cors: true
 
   listAccounts:
     handler: src/handlers/accounts.list
@@ -75,6 +106,7 @@ functions:
       - http:
           path: customers/{customerId}/accounts
           method: get
+          cors: true
 
   getAccount:
     handler: src/handlers/accounts.get
@@ -82,6 +114,7 @@ functions:
       - http:
           path: accounts/{accountId}
           method: get
+          cors: true
 
   # Optional stretch goals — stubs included for mid-senior candidates
   deposit:
@@ -90,6 +123,7 @@ functions:
       - http:
           path: accounts/{accountId}/deposits
           method: post
+          cors: true
 
   withdraw:
     handler: src/handlers/transactions.withdraw
@@ -97,6 +131,7 @@ functions:
       - http:
           path: accounts/{accountId}/withdrawals
           method: post
+          cors: true
 
   transfer:
     handler: src/handlers/transactions.transfer
@@ -104,3 +139,39 @@ functions:
       - http:
           path: transfers
           method: post
+          cors: true
+
+resources:
+  Resources:
+    CustomersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.stageConfig.${self:provider.stage}.customersTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: customerId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: customerId
+            KeyType: HASH
+
+    AccountsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.stageConfig.${self:provider.stage}.accountsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: accountId
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: accountId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: CustomerIdIndex
+            KeySchema:
+              - AttributeName: customerId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
